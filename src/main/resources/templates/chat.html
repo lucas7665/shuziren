@@ -47,6 +47,7 @@
                 const result = await response.json();
                 if (result.success) {
                     const select = document.getElementById('fileSelect');
+                    select.innerHTML = '<option value="">请选择要查询的文档...</option>';
                     result.data.forEach(file => {
                         const option = document.createElement('option');
                         option.value = file.fileId;

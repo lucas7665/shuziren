@@ -93,6 +93,8 @@ public class ChatDocUtil {
         
         OkHttpClient okHttpClient = new OkHttpClient().newBuilder()
                 .readTimeout(30, TimeUnit.SECONDS)
+                .writeTimeout(30, TimeUnit.SECONDS)
+                .pingInterval(20, TimeUnit.SECONDS)
                 .build();
 
         WebSocket webSocket = okHttpClient.newWebSocket(
@@ -102,6 +104,13 @@ public class ChatDocUtil {
                     public void onMessage(WebSocket webSocket, String text) {
                         log.info("收到WebSocket消息: {}", text);
                         JSONObject jsonObject = JSONUtil.parseObj(text);
+                        if (jsonObject.getInt("code") != 0) {
+                            log.error("WebSocket错误: {}", text);
+                            synchronized (lock) {
+                                lock.notify();
+                            }
+                            return;
+                        }
                         String content = jsonObject.getStr("content");
                         if (content != null) {
                             buffer.append(content);
@@ -123,9 +132,20 @@ public class ChatDocUtil {
                 }
         );
 
+        // 构建完整的请求体
+        JSONObject chatExtends = new JSONObject();
+        chatExtends.set("wikiFilterScore", 0.82);
+        chatExtends.set("temperature", 0.7);
+        
+        JSONObject message = new JSONObject();
+        message.set("role", "user");
+        message.set("content", question);
+
         JSONObject requestBody = new JSONObject();
-        requestBody.set("fileId", fileId);
-        requestBody.set("question", question);
+        requestBody.set("chatExtends", chatExtends);
+        requestBody.set("fileIds", JSONUtil.createArray().set(fileId));
+        requestBody.set("messages", JSONUtil.createArray().set(message));
+
         log.info("发送问题: {}", requestBody.toString());
         webSocket.send(requestBody.toString());
 

@@ -33,4 +33,10 @@ public class ChatController {
         log.info("接收到问答请求: {}", request);
         return chatService.chat(request);
     }
+
+    @GetMapping("/files")
+    public ApiResponse<?> getFileList() {
+        log.info("获取文件列表");
+        return chatService.getFileList();
+    }
 } 

@@ -3,7 +3,7 @@ package cn.xfyun.example.dto.chat;
 import lombok.Data;
 import lombok.Builder;
 
-import java.util.List;
+
 
 @Data
 @Builder
