@@ -1,0 +1,92 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>文档上传</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 800px; padding-top: 2rem; }
+        .upload-status { margin-top: 1rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav nav-pills mb-4">
+            <a class="nav-link active" href="/upload">文档上传</a>
+            <a class="nav-link" href="/chat">知识问答</a>
+        </nav>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">上传文档到知识库</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <input type="file" class="form-control" id="fileInput" accept=".txt,.doc,.docx,.pdf">
+                </div>
+                <button onclick="uploadFile()" class="btn btn-primary">上传文档</button>
+                <div id="uploadStatus" class="upload-status alert" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        async function uploadFile() {
+            const fileInput = document.getElementById('fileInput');
+            const statusDiv = document.getElementById('uploadStatus');
+            
+            if (!fileInput.files.length) {
+                showStatus('请选择文件', 'danger');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                showStatus('文件上传中...', 'info');
+                const response = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const result = await response.json();
+                if (result.success) {
+                    showStatus('文件上传成功！正在处理...', 'success');
+                    checkFileStatus(result.data.fileId);
+                } else {
+                    showStatus('上传失败：' + result.message, 'danger');
+                }
+            } catch (error) {
+                showStatus('上传出错：' + error.message, 'danger');
+            }
+        }
+
+        async function checkFileStatus(fileId) {
+            try {
+                const response = await fetch(`/api/file/status/${fileId}`);
+                const result = await response.json();
+                if (result.success) {
+                    if (result.data === 'vectored') {
+                        showStatus('文件处理完成，可以开始提问了！', 'success');
+                    } else {
+                        showStatus('文件正在处理中...', 'info');
+                        setTimeout(() => checkFileStatus(fileId), 5000);
+                    }
+                } else {
+                    showStatus('状态查询失败：' + result.message, 'danger');
+                }
+            } catch (error) {
+                showStatus('状态查询失败：' + error.message, 'danger');
+            }
+        }
+
+        function showStatus(message, type) {
+            const statusDiv = document.getElementById('uploadStatus');
+            statusDiv.className = `upload-status alert alert-${type}`;
+            statusDiv.textContent = message;
+            statusDiv.style.display = 'block';
+        }
+    </script>
+</body>
+</html> 

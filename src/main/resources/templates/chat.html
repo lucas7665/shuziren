@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>知识问答</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 800px; padding-top: 2rem; }
+        .chat-box { min-height: 200px; }
+        .answer { white-space: pre-wrap; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav nav-pills mb-4">
+            <a class="nav-link" href="/upload">文档上传</a>
+            <a class="nav-link active" href="/chat">知识问答</a>
+        </nav>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">知识库问答</h5>
+            </div>
+            <div class="card-body">
+                <div class="mb-3">
+                    <label class="form-label">选择文档</label>
+                    <select id="fileSelect" class="form-select">
+                        <option value="">请选择要查询的文档...</option>
+                    </select>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">输入问题</label>
+                    <textarea id="question" class="form-control" rows="3" placeholder="请输入您的问题..."></textarea>
+                </div>
+                <button onclick="askQuestion()" class="btn btn-primary">提问</button>
+                
+                <div id="answer" class="chat-box mt-4 p-3 bg-light rounded answer" style="display: none;"></div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 页面加载时获取文档列表
+        window.onload = async function() {
+            try {
+                const response = await fetch('/api/files');
+                const result = await response.json();
+                if (result.success) {
+                    const select = document.getElementById('fileSelect');
+                    result.data.forEach(file => {
+                        const option = document.createElement('option');
+                        option.value = file.fileId;
+                        option.textContent = file.fileName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('获取文档列表失败：', error);
+            }
+        };
+
+        async function askQuestion() {
+            const fileSelect = document.getElementById('fileSelect');
+            const questionInput = document.getElementById('question');
+            const answerDiv = document.getElementById('answer');
+            
+            if (!fileSelect.value) {
+                alert('请选择要查询的文档');
+                return;
+            }
+
+            const question = questionInput.value.trim();
+            if (!question) {
+                alert('请输入问题');
+                return;
+            }
+
+            try {
+                answerDiv.textContent = '正在思考中...';
+                answerDiv.style.display = 'block';
+
+                const response = await fetch('/api/chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        fileId: fileSelect.value,
+                        question: question
+                    })
+                });
+
+                const result = await response.json();
+                if (result.success) {
+                    answerDiv.innerHTML = `<strong>答案：</strong><br>${result.data}`;
+                } else {
+                    answerDiv.innerHTML = `<div class="text-danger">获取答案失败：${result.message}</div>`;
+                }
+            } catch (error) {
+                answerDiv.innerHTML = `<div class="text-danger">请求出错：${error.message}</div>`;
+            }
+        }
+    </script>
+</body>
+</html> 
