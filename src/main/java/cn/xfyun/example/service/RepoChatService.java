@@ -2,6 +2,7 @@ package cn.xfyun.example.service;
 
 import cn.hutool.json.JSONObject;
 import cn.hutool.json.JSONUtil;
+import cn.hutool.json.JSONArray;
 import cn.xfyun.example.dto.ApiResponse;
 import cn.xfyun.example.dto.repo.RepoChatRequest;
 import cn.xfyun.example.util.ApiAuthUtil;
@@ -34,13 +35,58 @@ public class RepoChatService {
         String wsUrl = chatUrl + "?appId=" + appId + "&timestamp=" + ts + "&signature=" + signature;
         
         // 构建请求体
-        JSONObject message = new JSONObject();
-        message.set("role", "user");
-        message.set("content", request.getQuestion());
-
         JSONObject requestBody = new JSONObject();
-        requestBody.set("repoId", request.getRepoId());
-        requestBody.set("messages", JSONUtil.createArray().set(message));
+        
+        // 添加知识库ID或文件ID列表
+        if (request.getRepoId() != null) {
+            requestBody.set("repoId", request.getRepoId());
+        }
+        if (request.getFileIds() != null && !request.getFileIds().isEmpty()) {
+            requestBody.set("fileIds", request.getFileIds());
+        }
+
+        // 设置topN
+        if (request.getTopN() != null) {
+            requestBody.set("topN", request.getTopN());
+        }
+
+        // 构建消息列表
+        JSONArray messages = JSONUtil.createArray();
+        if (request.getMessages() != null) {
+            for (RepoChatRequest.Message msg : request.getMessages()) {
+                JSONObject msgObj = new JSONObject();
+                msgObj.set("role", msg.getRole());
+                msgObj.set("content", msg.getContent());
+                messages.add(msgObj);
+            }
+        }
+        // 添加当前问题
+        JSONObject currentMsg = new JSONObject();
+        currentMsg.set("role", "user");
+        currentMsg.set("content", request.getQuestion());
+        messages.add(currentMsg);
+        requestBody.set("messages", messages);
+
+        // 添加chatExtends配置
+        if (request.getChatExtends() != null) {
+            JSONObject chatExt = new JSONObject();
+            RepoChatRequest.ChatExtends ext = request.getChatExtends();
+            
+            if (ext.getWikiPromptTpl() != null) {
+                chatExt.set("wikiPromptTpl", ext.getWikiPromptTpl());
+            }
+            if (ext.getWikiFilterScore() != null) {
+                chatExt.set("wikiFilterScore", ext.getWikiFilterScore());
+            }
+            if (ext.getSpark() != null) {
+                chatExt.set("spark", ext.getSpark());
+            }
+            if (ext.getTemperature() != null) {
+                chatExt.set("temperature", ext.getTemperature());
+            }
+            
+            requestBody.set("chatExtends", chatExt);
+        }
 
         final StringBuilder buffer = new StringBuilder();
         final Object lock = new Object();

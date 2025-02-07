@@ -15,12 +15,18 @@
             border-radius: 1rem;
             max-width: 80%;
         }
-        .chat-message.user .content { 
-            background: #007bff;
-            color: white;
+        .chat-message.user .content { background: #007bff; color: white; }
+        .chat-message.assistant .content { background: #f8f9fa; }
+        .chat-message .reference {
+            font-size: 0.8rem;
+            color: #666;
+            margin-top: 0.5rem;
         }
-        .chat-message.assistant .content { 
+        .settings-panel {
             background: #f8f9fa;
+            padding: 1rem;
+            border-radius: 0.5rem;
+            margin-bottom: 1rem;
         }
     </style>
 </head>
@@ -45,9 +51,47 @@
                             <option value="">请选择知识库...</option>
                         </select>
                     </div>
+                    <div class="col-auto">
+                        <button class="btn btn-outline-secondary" onclick="toggleSettings()">
+                            <i class="bi bi-gear"></i> 高级设置
+                        </button>
+                    </div>
                 </div>
             </div>
             <div class="card-body">
+                <div class="settings-panel mb-3" id="settingsPanel" style="display: none;">
+                    <div class="row g-3">
+                        <div class="col-md-6">
+                            <label class="form-label">结果分数阈值</label>
+                            <input type="range" class="form-range" id="wikiFilterScore" 
+                                   min="0" max="1" step="0.01" value="0.82">
+                            <div class="text-muted small">当前值: <span id="scoreValue">0.82</span></div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">查询数量</label>
+                            <input type="number" class="form-control" id="topN" 
+                                   min="1" max="200" value="3">
+                        </div>
+                        <div class="col-md-6">
+                            <div class="form-check">
+                                <input class="form-check-input" type="checkbox" id="spark">
+                                <label class="form-check-label">开启大模型兜底</label>
+                            </div>
+                        </div>
+                        <div class="col-md-6">
+                            <label class="form-label">大模型温度</label>
+                            <input type="range" class="form-range" id="temperature" 
+                                   min="0" max="1" step="0.1" value="0.5">
+                            <div class="text-muted small">当前值: <span id="tempValue">0.5</span></div>
+                        </div>
+                        <div class="col-12">
+                            <label class="form-label">问答提示模板</label>
+                            <textarea class="form-control" id="wikiPromptTpl" rows="3" 
+                                      placeholder="请将以下内容作为已知信息：&#10;<wikicontent>&#10;请根据以上内容回答用户的问题。&#10;问题:<wikiquestion>&#10;回答:"></textarea>
+                        </div>
+                    </div>
+                </div>
+
                 <div class="chat-box mb-3" id="chatBox">
                     <!-- 聊天消息将在这里显示 -->
                 </div>
@@ -61,8 +105,20 @@
 
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
     <script>
+        let chatHistory = [];
+
         // 页面加载时获取知识库列表
         window.onload = loadRepos;
+
+        // 更新阈值显示
+        document.getElementById('threshold').addEventListener('input', function(e) {
+            document.getElementById('thresholdValue').textContent = e.target.value;
+        });
+
+        function toggleSettings() {
+            const panel = document.getElementById('settingsPanel');
+            panel.style.display = panel.style.display === 'none' ? 'block' : 'none';
+        }
 
         async function loadRepos() {
             try {
@@ -100,20 +156,37 @@
             addMessage(question, true);
             document.getElementById('questionInput').value = '';
 
+            // 获取高级设置参数
+            const chatExtends = {
+                wikiPromptTpl: document.getElementById('wikiPromptTpl').value.trim(),
+                wikiFilterScore: parseFloat(document.getElementById('wikiFilterScore').value),
+                spark: document.getElementById('spark').checked,
+                temperature: parseFloat(document.getElementById('temperature').value)
+            };
+
+            const requestBody = {
+                repoId: repoId,
+                question: question,
+                topN: parseInt(document.getElementById('topN').value),
+                messages: chatHistory.map(msg => ({
+                    role: 'user',
+                    content: msg
+                })),
+                chatExtends: chatExtends
+            };
+
             try {
                 const response = await fetch('/api/repo-chat', {
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json'
                     },
-                    body: JSON.stringify({
-                        repoId: repoId,
-                        question: question
-                    })
+                    body: JSON.stringify(requestBody)
                 });
                 const result = await response.json();
                 if (result.success) {
                     addMessage(result.data, false);
+                    chatHistory.push(question); // 添加到历史记录
                 } else {
                     addMessage('抱歉，回答失败：' + result.message, false);
                 }
@@ -127,7 +200,18 @@
             const chatBox = document.getElementById('chatBox');
             const messageDiv = document.createElement('div');
             messageDiv.className = `chat-message ${isUser ? 'user' : 'assistant'}`;
-            messageDiv.innerHTML = `<div class="content">${content}</div>`;
+            
+            // 如果是AI回答且包含引用信息
+            if (!isUser && content.includes('参考来源：')) {
+                const [answer, reference] = content.split('参考来源：');
+                messageDiv.innerHTML = `
+                    <div class="content">${answer}</div>
+                    <div class="reference">参考来源：${reference}</div>
+                `;
+            } else {
+                messageDiv.innerHTML = `<div class="content">${content}</div>`;
+            }
+            
             chatBox.appendChild(messageDiv);
             chatBox.scrollTop = chatBox.scrollHeight;
         }
