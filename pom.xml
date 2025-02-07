@@ -55,6 +55,13 @@
             <artifactId>okhttp</artifactId>
             <version>4.10.0</version>
         </dependency>
+
+        <!-- 删除原有的 Springfox 依赖 -->
+        <dependency>
+            <groupId>org.springdoc</groupId>
+            <artifactId>springdoc-openapi-ui</artifactId>
+            <version>1.6.9</version>
+        </dependency>
     </dependencies>
 
     <build>
