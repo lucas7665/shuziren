@@ -33,4 +33,9 @@ public class PageController {
     public String repos() {
         return "repos";
     }
+
+    @GetMapping("/repo-chat")
+    public String repoChat() {
+        return "repo-chat";
+    }
 } 

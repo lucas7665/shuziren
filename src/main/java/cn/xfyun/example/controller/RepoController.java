@@ -44,4 +44,10 @@ public class RepoController {
         log.info("从知识库移除文件: repoId={}, fileId={}", repoId, fileId);
         return repoService.removeFile(repoId, fileId);
     }
+
+    @PostMapping("/{repoId}/files/{fileId}")
+    public ApiResponse<?> addFile(@PathVariable String repoId, @PathVariable String fileId) {
+        log.info("添加文件到知识库: repoId={}, fileId={}", repoId, fileId);
+        return repoService.addFileToRepo(repoId, fileId);
+    }
 } 

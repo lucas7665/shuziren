@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>知识库问答</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1000px; padding-top: 2rem; }
+        .chat-box { height: 400px; overflow-y: auto; }
+        .chat-message { margin-bottom: 1rem; }
+        .chat-message.user { text-align: right; }
+        .chat-message .content { 
+            display: inline-block;
+            padding: 0.5rem 1rem;
+            border-radius: 1rem;
+            max-width: 80%;
+        }
+        .chat-message.user .content { 
+            background: #007bff;
+            color: white;
+        }
+        .chat-message.assistant .content { 
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav nav-pills mb-4">
+            <a class="nav-link" href="/upload">文档上传</a>
+            <a class="nav-link" href="/chat">文档问答</a>
+            <a class="nav-link" href="/files">文档管理</a>
+            <a class="nav-link" href="/repos">知识库管理</a>
+            <a class="nav-link active" href="/repo-chat">知识库问答</a>
+        </nav>
+
+        <div class="card mb-4">
+            <div class="card-header">
+                <div class="row align-items-center">
+                    <div class="col">
+                        <h5 class="card-title mb-0">知识库问答</h5>
+                    </div>
+                    <div class="col-auto">
+                        <select class="form-select" id="repoSelect">
+                            <option value="">请选择知识库...</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+            <div class="card-body">
+                <div class="chat-box mb-3" id="chatBox">
+                    <!-- 聊天消息将在这里显示 -->
+                </div>
+                <div class="input-group">
+                    <input type="text" class="form-control" id="questionInput" placeholder="请输入您的问题...">
+                    <button class="btn btn-primary" onclick="askQuestion()">发送</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        // 页面加载时获取知识库列表
+        window.onload = loadRepos;
+
+        async function loadRepos() {
+            try {
+                const response = await fetch('/api/repos');
+                const result = await response.json();
+                if (result.success) {
+                    const select = document.getElementById('repoSelect');
+                    select.innerHTML = '<option value="">请选择知识库...</option>';
+                    result.data.forEach(repo => {
+                        const option = document.createElement('option');
+                        option.value = repo.repoId;
+                        option.textContent = repo.repoName;
+                        select.appendChild(option);
+                    });
+                }
+            } catch (error) {
+                console.error('获取知识库列表失败：', error);
+            }
+        }
+
+        async function askQuestion() {
+            const repoId = document.getElementById('repoSelect').value;
+            const question = document.getElementById('questionInput').value.trim();
+            
+            if (!repoId) {
+                alert('请先选择知识库');
+                return;
+            }
+            if (!question) {
+                alert('请输入问题');
+                return;
+            }
+
+            // 添加用户问题到聊天框
+            addMessage(question, true);
+            document.getElementById('questionInput').value = '';
+
+            try {
+                const response = await fetch('/api/repo-chat', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        repoId: repoId,
+                        question: question
+                    })
+                });
+                const result = await response.json();
+                if (result.success) {
+                    addMessage(result.data, false);
+                } else {
+                    addMessage('抱歉，回答失败：' + result.message, false);
+                }
+            } catch (error) {
+                console.error('问答失败：', error);
+                addMessage('抱歉，系统出现错误', false);
+            }
+        }
+
+        function addMessage(content, isUser) {
+            const chatBox = document.getElementById('chatBox');
+            const messageDiv = document.createElement('div');
+            messageDiv.className = `chat-message ${isUser ? 'user' : 'assistant'}`;
+            messageDiv.innerHTML = `<div class="content">${content}</div>`;
+            chatBox.appendChild(messageDiv);
+            chatBox.scrollTop = chatBox.scrollHeight;
+        }
+
+        // 支持按回车发送消息
+        document.getElementById('questionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+    </script>
+</body>
+</html> 

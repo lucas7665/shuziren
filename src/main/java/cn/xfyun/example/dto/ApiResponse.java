@@ -21,4 +21,9 @@ public class ApiResponse<T> {
         response.setMessage(message);
         return response;
     }
+
+    public ApiResponse<?> setMessage(String message) {
+        this.message = message;
+        return this;
+    }
 } 

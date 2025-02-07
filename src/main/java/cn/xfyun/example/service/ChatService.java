@@ -59,16 +59,49 @@ public class ChatService {
 
             UploadResp resp = chatDocUtil.upload(tempFile.getAbsolutePath(), uploadUrl, appId, secret);
             tempFile.delete();
-
+            
             if (resp != null && resp.getCode() == 0) {
-                // 保存文件信息，添加上传时间
-                fileMap.put(resp.getData().getFileId(), new FileInfo(
-                    resp.getData().getFileId(),
+                String fileId = resp.getData().getFileId();
+                
+                // 等待文件向量化完成
+                int maxAttempts = 30; // 最多等待30次
+                int attempts = 0;
+                String status = "";
+                
+                while (attempts < maxAttempts) {
+                    FileStatusResp statusResp = chatDocUtil.getFileStatus(fileStatusUrl, fileId, appId, secret);
+                    if (statusResp != null && statusResp.getCode() == 0 && !statusResp.getData().isEmpty()) {
+                        status = statusResp.getData().get(0).getFileStatus();
+                        log.info("文件状态: {}", status);
+                        
+                        if ("vectored".equals(status)) {
+                            // 向量化完成
+                            fileMap.put(fileId, new FileInfo(
+                                fileId,
+                                file.getOriginalFilename(),
+                                status,
+                                System.currentTimeMillis()
+                            ));
+                            return ApiResponse.success(resp.getData());
+                        } else if ("failed".equals(status)) {
+                            return ApiResponse.error("文件处理失败");
+                        }
+                    }
+                    
+                    // 等待2秒后再次查询
+                    Thread.sleep(2000);
+                    attempts++;
+                }
+                
+                // 超时但仍在处理中
+                fileMap.put(fileId, new FileInfo(
+                    fileId,
                     file.getOriginalFilename(),
-                    "uploaded",
+                    status,
                     System.currentTimeMillis()
                 ));
-                return ApiResponse.success(resp.getData());
+                return ApiResponse.success(resp.getData())
+                    .setMessage("文件已上传，正在处理中，请稍后查看状态");
             } else {
                 return ApiResponse.error(resp != null ? resp.getDesc() : "上传失败");
             }

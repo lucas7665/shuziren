@@ -80,8 +80,11 @@
                         <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
                     </div>
                     <div class="modal-body">
-                        <div class="mb-3">
-                            <button class="btn btn-primary btn-sm" onclick="showAddFile()">添加文件</button>
+                        <div class="d-flex justify-content-between align-items-center mb-3">
+                            <h6 class="mb-0">文件列表</h6>
+                            <button class="btn btn-primary" onclick="showAddFileModal()">
+                                <i class="bi bi-plus"></i> 上传文件
+                            </button>
                         </div>
                         <table class="table">
                             <thead>
@@ -99,6 +102,34 @@
                 </div>
             </div>
         </div>
+
+        <!-- 添加文件选择弹窗 -->
+        <div class="modal fade" id="addFileModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">添加文件到知识库</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="uploadForm">
+                            <div class="mb-3">
+                                <label class="form-label">选择文件</label>
+                                <input type="file" class="form-control" id="fileInput" required>
+                                <div class="form-text">支持PDF、Word、TXT等格式，单个文件最大20MB</div>
+                            </div>
+                        </form>
+                        <div class="progress d-none">
+                            <div class="progress-bar" role="progressbar" style="width: 0%"></div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="uploadAndAddFile()">上传并添加</button>
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
@@ -106,6 +137,7 @@
         let currentRepoId = '';
         const createRepoModal = new bootstrap.Modal(document.getElementById('createRepoModal'));
         const viewFilesModal = new bootstrap.Modal(document.getElementById('viewFilesModal'));
+        const addFileModal = new bootstrap.Modal(document.getElementById('addFileModal'));
 
         // 页面加载时获取知识库列表
         window.onload = loadRepos;
@@ -125,8 +157,11 @@
                             <td>${repo.repoTags || '-'}</td>
                             <td>${repo.createTime}</td>
                             <td>
-                                <button class="btn btn-sm btn-info" onclick="viewFiles('${repo.repoId}')">查看文件</button>
-                                <button class="btn btn-sm btn-danger" onclick="deleteRepo('${repo.repoId}')">删除</button>
+                                <div class="btn-group" role="group">
+                                    <button class="btn btn-sm btn-info" onclick="viewFiles('${repo.repoId}')">查看文件</button>
+                                    <button class="btn btn-sm btn-success" onclick="showAddFileModal('${repo.repoId}')">上传文件</button>
+                                    <button class="btn btn-sm btn-danger" onclick="deleteRepo('${repo.repoId}')">删除</button>
+                                </div>
                             </td>
                         `;
                         tbody.appendChild(tr);
@@ -184,7 +219,7 @@
                         const tr = document.createElement('tr');
                         tr.innerHTML = `
                             <td>${file.fileName}</td>
-                            <td>${file.fileStatus}</td>
+                            <td>${getStatusText(file.fileStatus)}</td>
                             <td>${file.createTime}</td>
                             <td>
                                 <button class="btn btn-sm btn-danger" onclick="removeFile('${file.fileId}')">移除</button>
@@ -233,6 +268,70 @@
                 console.error('移除文件失败：', error);
                 alert('移除失败：' + error.message);
             }
+        }
+
+        async function showAddFileModal(repoId) {
+            currentRepoId = repoId;
+            document.getElementById('uploadForm').reset();
+            document.querySelector('.progress').classList.add('d-none');
+            document.querySelector('.progress-bar').style.width = '0%';
+            addFileModal.show();
+        }
+
+        async function uploadAndAddFile() {
+            const fileInput = document.getElementById('fileInput');
+            if (!fileInput.files[0]) {
+                alert('请选择要上传的文件');
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            try {
+                // 上传文件并等待向量化
+                const uploadResp = await fetch('/api/upload', {
+                    method: 'POST',
+                    body: formData
+                });
+                const uploadResult = await uploadResp.json();
+                
+                if (!uploadResult.success) {
+                    throw new Error(uploadResult.message);
+                }
+
+                // 直接添加到知识库
+                const fileId = uploadResult.data.fileId;
+                const addResp = await fetch(`/api/repos/${currentRepoId}/files/${fileId}`, {
+                    method: 'POST'
+                });
+                const addResult = await addResp.json();
+
+                if (addResult.success) {
+                    addFileModal.hide();
+                    viewFiles(currentRepoId); // 刷新文件列表
+                    alert('文件上传成功！' + (uploadResult.message || ''));
+                } else {
+                    throw new Error(addResult.message);
+                }
+            } catch (error) {
+                console.error('上传并添加文件失败：', error);
+                alert('上传并添加文件失败：' + error.message);
+            }
+        }
+
+        function getStatusText(status) {
+            const statusMap = {
+                'uploaded': '已上传',
+                'texted': '已文本化',
+                'ocring': 'OCR识别中',
+                'spliting': '切分中',
+                'splited': '已切分',
+                'vectoring': '向量化中',
+                'vectored': '已向量化',
+                'failed': '失败'
+            };
+            return statusMap[status] || status;
         }
     </script>
 </body>
