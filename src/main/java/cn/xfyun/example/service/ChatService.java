@@ -48,6 +48,7 @@ public class ChatService {
         private String fileId;
         private String fileName;
         private String status;
+        private long uploadTime;
     }
 
     public ApiResponse<?> uploadFile(MultipartFile file) {
@@ -60,11 +61,12 @@ public class ChatService {
             tempFile.delete();
 
             if (resp != null && resp.getCode() == 0) {
-                // 保存文件信息
+                // 保存文件信息，添加上传时间
                 fileMap.put(resp.getData().getFileId(), new FileInfo(
                     resp.getData().getFileId(),
                     file.getOriginalFilename(),
-                    "uploaded"
+                    "uploaded",
+                    System.currentTimeMillis()
                 ));
                 return ApiResponse.success(resp.getData());
             } else {
@@ -97,9 +99,9 @@ public class ChatService {
         }
     }
 
-    public ApiResponse<?> getFileList() {
+    public ApiResponse<?> getAllFiles() {
         return ApiResponse.success(fileMap.values().stream()
-            .filter(file -> "vectored".equals(file.getStatus()))
+            .sorted((a, b) -> Long.compare(b.getUploadTime(), a.getUploadTime()))  // 按上传时间倒序
             .collect(Collectors.toList()));
     }
 
@@ -111,5 +113,11 @@ public class ChatService {
             log.error("问答失败", e);
             return ApiResponse.error("问答失败: " + e.getMessage());
         }
+    }
+
+    public ApiResponse<?> getFileList() {
+        return ApiResponse.success(fileMap.values().stream()
+            .filter(file -> "vectored".equals(file.getStatus()))
+            .collect(Collectors.toList()));
     }
 } 

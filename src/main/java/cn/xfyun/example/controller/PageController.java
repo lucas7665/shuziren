@@ -23,4 +23,14 @@ public class PageController {
     public String chat() {
         return "chat";
     }
+
+    @GetMapping("/files")
+    public String files() {
+        return "files";
+    }
+
+    @GetMapping("/repos")
+    public String repos() {
+        return "repos";
+    }
 } 

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>文档管理</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1000px; padding-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav nav-pills mb-4">
+            <a class="nav-link" href="/upload">文档上传</a>
+            <a class="nav-link" href="/chat">知识问答</a>
+            <a class="nav-link active" href="/files">文档管理</a>
+        </nav>
+
+        <div class="card">
+            <div class="card-header">
+                <h5 class="card-title mb-0">文档列表</h5>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>文件名</th>
+                            <th>文件ID</th>
+                            <th>状态</th>
+                            <th>上传时间</th>
+                        </tr>
+                    </thead>
+                    <tbody id="fileList">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 状态映射
+        const statusMap = {
+            'uploaded': '已上传',
+            'texted': '已文本化',
+            'ocring': 'OCR识别中',
+            'spliting': '切分中',
+            'splited': '已切分',
+            'vectoring': '向量化中',
+            'vectored': '已向量化',
+            'failed': '失败'
+        };
+
+        // 页面加载时获取文档列表
+        window.onload = async function() {
+            try {
+                const response = await fetch('/api/files/all');
+                const result = await response.json();
+                if (result.success) {
+                    const tbody = document.getElementById('fileList');
+                    result.data.forEach(file => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${file.fileName}</td>
+                            <td>${file.fileId}</td>
+                            <td>${statusMap[file.status] || file.status}</td>
+                            <td>${new Date(file.uploadTime).toLocaleString()}</td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (error) {
+                console.error('获取文档列表失败：', error);
+            }
+        };
+    </script>
+</body>
+</html> 

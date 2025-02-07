@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org">
+<head>
+    <meta charset="UTF-8">
+    <title>知识库管理</title>
+    <link href="https://cdn.bootcdn.net/ajax/libs/twitter-bootstrap/5.2.3/css/bootstrap.min.css" rel="stylesheet">
+    <style>
+        .container { max-width: 1000px; padding-top: 2rem; }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <nav class="nav nav-pills mb-4">
+            <a class="nav-link" href="/upload">文档上传</a>
+            <a class="nav-link" href="/chat">知识问答</a>
+            <a class="nav-link" href="/files">文档管理</a>
+            <a class="nav-link active" href="/repos">知识库管理</a>
+        </nav>
+
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="card-title mb-0">知识库列表</h5>
+                <button class="btn btn-primary btn-sm" onclick="showCreateRepo()">创建知识库</button>
+            </div>
+            <div class="card-body">
+                <table class="table">
+                    <thead>
+                        <tr>
+                            <th>知识库名称</th>
+                            <th>简介</th>
+                            <th>标签</th>
+                            <th>创建时间</th>
+                            <th>操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="repoList">
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <!-- 创建知识库弹窗 -->
+        <div class="modal fade" id="createRepoModal" tabindex="-1">
+            <div class="modal-dialog">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">创建知识库</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <form id="createRepoForm">
+                            <div class="mb-3">
+                                <label class="form-label">知识库名称</label>
+                                <input type="text" class="form-control" name="repoName" required>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">知识库简介</label>
+                                <textarea class="form-control" name="repoDesc" rows="3"></textarea>
+                            </div>
+                            <div class="mb-3">
+                                <label class="form-label">标签（多个标签用逗号分隔）</label>
+                                <input type="text" class="form-control" name="repoTags">
+                            </div>
+                        </form>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">取消</button>
+                        <button type="button" class="btn btn-primary" onclick="createRepo()">创建</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 查看文件弹窗 -->
+        <div class="modal fade" id="viewFilesModal" tabindex="-1">
+            <div class="modal-dialog modal-lg">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">知识库文件</h5>
+                        <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                    </div>
+                    <div class="modal-body">
+                        <div class="mb-3">
+                            <button class="btn btn-primary btn-sm" onclick="showAddFile()">添加文件</button>
+                        </div>
+                        <table class="table">
+                            <thead>
+                                <tr>
+                                    <th>文件名</th>
+                                    <th>状态</th>
+                                    <th>创建时间</th>
+                                    <th>操作</th>
+                                </tr>
+                            </thead>
+                            <tbody id="repoFileList">
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdn.bootcdn.net/ajax/libs/bootstrap/5.2.3/js/bootstrap.bundle.min.js"></script>
+    <script>
+        let currentRepoId = '';
+        const createRepoModal = new bootstrap.Modal(document.getElementById('createRepoModal'));
+        const viewFilesModal = new bootstrap.Modal(document.getElementById('viewFilesModal'));
+
+        // 页面加载时获取知识库列表
+        window.onload = loadRepos;
+
+        async function loadRepos() {
+            try {
+                const response = await fetch('/api/repos');
+                const result = await response.json();
+                if (result.success) {
+                    const tbody = document.getElementById('repoList');
+                    tbody.innerHTML = '';
+                    result.data.forEach(repo => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${repo.repoName}</td>
+                            <td>${repo.repoDesc || '-'}</td>
+                            <td>${repo.repoTags || '-'}</td>
+                            <td>${repo.createTime}</td>
+                            <td>
+                                <button class="btn btn-sm btn-info" onclick="viewFiles('${repo.repoId}')">查看文件</button>
+                                <button class="btn btn-sm btn-danger" onclick="deleteRepo('${repo.repoId}')">删除</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                }
+            } catch (error) {
+                console.error('获取知识库列表失败：', error);
+            }
+        }
+
+        function showCreateRepo() {
+            document.getElementById('createRepoForm').reset();
+            createRepoModal.show();
+        }
+
+        async function createRepo() {
+            const form = document.getElementById('createRepoForm');
+            const formData = new FormData(form);
+            const data = {
+                repoName: formData.get('repoName'),
+                repoDesc: formData.get('repoDesc'),
+                repoTags: formData.get('repoTags')
+            };
+
+            try {
+                const response = await fetch('/api/repos/create', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(data)
+                });
+                const result = await response.json();
+                if (result.success) {
+                    createRepoModal.hide();
+                    loadRepos();
+                } else {
+                    alert('创建失败：' + result.message);
+                }
+            } catch (error) {
+                console.error('创建知识库失败：', error);
+                alert('创建失败：' + error.message);
+            }
+        }
+
+        async function viewFiles(repoId) {
+            currentRepoId = repoId;
+            try {
+                const response = await fetch(`/api/repos/${repoId}/files`);
+                const result = await response.json();
+                if (result.success) {
+                    const tbody = document.getElementById('repoFileList');
+                    tbody.innerHTML = '';
+                    result.data.forEach(file => {
+                        const tr = document.createElement('tr');
+                        tr.innerHTML = `
+                            <td>${file.fileName}</td>
+                            <td>${file.fileStatus}</td>
+                            <td>${file.createTime}</td>
+                            <td>
+                                <button class="btn btn-sm btn-danger" onclick="removeFile('${file.fileId}')">移除</button>
+                            </td>
+                        `;
+                        tbody.appendChild(tr);
+                    });
+                    viewFilesModal.show();
+                }
+            } catch (error) {
+                console.error('获取知识库文件列表失败：', error);
+            }
+        }
+
+        async function deleteRepo(repoId) {
+            if (!confirm('确定要删除该知识库吗？')) return;
+            try {
+                const response = await fetch(`/api/repos/${repoId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    loadRepos();
+                } else {
+                    alert('删除失败：' + result.message);
+                }
+            } catch (error) {
+                console.error('删除知识库失败：', error);
+                alert('删除失败：' + error.message);
+            }
+        }
+
+        async function removeFile(fileId) {
+            if (!confirm('确定要移除该文件吗？')) return;
+            try {
+                const response = await fetch(`/api/repos/${currentRepoId}/files/${fileId}`, {
+                    method: 'DELETE'
+                });
+                const result = await response.json();
+                if (result.success) {
+                    viewFiles(currentRepoId);
+                } else {
+                    alert('移除失败：' + result.message);
+                }
+            } catch (error) {
+                console.error('移除文件失败：', error);
+                alert('移除失败：' + error.message);
+            }
+        }
+    </script>
+</body>
+</html> 

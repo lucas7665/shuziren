@@ -39,4 +39,10 @@ public class ChatController {
         log.info("获取文件列表");
         return chatService.getFileList();
     }
+
+    @GetMapping("/files/all")
+    public ApiResponse<?> getAllFiles() {
+        log.info("获取所有文件列表");
+        return chatService.getAllFiles();
+    }
 } 
