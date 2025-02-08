@@ -77,9 +77,11 @@ public class RepoChatService {
             }
             if (ext.getWikiFilterScore() != null) {
                 chatExt.set("wikiFilterScore", ext.getWikiFilterScore());
+                log.info("设置相似度阈值: {}", ext.getWikiFilterScore());
             }
             if (ext.getSpark() != null) {
                 chatExt.set("spark", ext.getSpark());
+                log.info("是否开启大模型兜底: {}", ext.getSpark());
             }
             if (ext.getTemperature() != null) {
                 chatExt.set("temperature", ext.getTemperature());
@@ -87,6 +89,10 @@ public class RepoChatService {
             
             requestBody.set("chatExtends", chatExt);
         }
+
+        // 添加请求日志
+        log.info("知识库问答请求: repoId={}, question={}, requestBody={}", 
+            request.getRepoId(), request.getQuestion(), requestBody);
 
         final StringBuilder buffer = new StringBuilder();
         final Object lock = new Object();
@@ -98,10 +104,18 @@ public class RepoChatService {
                 public void onMessage(WebSocket webSocket, String text) {
                     JSONObject response = JSONUtil.parseObj(text);
                     if (response.getInt("code") == 0) {
+                        // 添加响应状态日志
+                        log.debug("收到响应: status={}, content={}", 
+                            response.getInt("status"), response.getStr("content", ""));
+                        
+                        // 记录引用信息
+                        if (response.getInt("status") == 99) {
+                            log.info("文档引用: {}", response.getStr("fileRefer", ""));
+                        }
+
                         String content = response.getStr("content", "");
                         buffer.append(content);
                         
-                        // 如果是最后一条消息，通知主线程
                         if (response.getInt("status") == 2) {
                             synchronized (lock) {
                                 lock.notify();
