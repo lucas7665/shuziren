@@ -101,3 +101,103 @@ mvn spring-boot:run
 - [ ] 优化文档处理速度
 - [ ] 增加批量导入功能
 - [ ] 添加数据统计分析
+
+## 常用接口说明
+
+### 1. 知识库问答接口
+```http
+POST /api/repo-chat
+
+{
+    "repoId": "知识库ID",
+    "question": "用户问题",
+    "topN": 3,
+    "chatExtends": {
+        "wikiPromptTpl": "基于以下内容回答问题：\n<wikicontent>\n\n问题：<wikiquestion>\n回答：",
+        "wikiFilterScore": 0.82,
+        "spark": true,
+        "temperature": 0.5
+    }
+}
+```
+
+响应格式：
+```json
+{
+    "success": true,
+    "data": {
+        "answer": "AI的回答内容...",
+        "references": {
+            "files": [
+                "参考文档1.pdf",
+                "参考文档2.docx"
+            ]
+        }
+    }
+}
+```
+
+### 2. 知识库管理接口
+
+#### 创建知识库
+```http
+POST /api/repos
+
+{
+    "repoName": "知识库名称",
+    "repoDesc": "知识库描述",
+    "repoTags": "标签1,标签2"
+}
+```
+
+#### 获取知识库列表
+```http
+GET /api/repos
+```
+
+#### 删除知识库
+```http
+DELETE /api/repos/{repoId}
+```
+
+#### 添加文档到知识库
+```http
+POST /api/repos/{repoId}/files/{fileId}
+```
+
+#### 从知识库移除文档
+```http
+DELETE /api/repos/{repoId}/files/{fileId}
+```
+
+### 3. 文档管理接口
+
+#### 上传文档
+```http
+POST /api/files
+Content-Type: multipart/form-data
+
+file: 文件内容
+```
+
+#### 获取文档状态
+```http
+GET /api/files/{fileId}/status
+```
+
+### 4. 接口使用建议
+
+1. 知识库问答
+- 首次调用建议关闭spark，确保答案来自知识库
+- 可以通过调整wikiFilterScore来控制匹配精度
+- 建议保留默认的提示模板，除非有特殊需求
+
+2. 文档处理
+- 上传文档后要等待向量化完成
+- 可以通过状态接口查询处理进度
+- 只有vectored状态的文档才能添加到知识库
+
+3. 错误处理
+- 所有接口都使用统一的响应格式
+- success字段表示是否成功
+- 失败时message字段包含错误信息
