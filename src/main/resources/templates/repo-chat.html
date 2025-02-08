@@ -202,12 +202,22 @@
             const messageDiv = document.createElement('div');
             messageDiv.className = `chat-message ${isUser ? 'user' : 'assistant'}`;
             
-            // 如果是AI回答且包含引用信息
-            if (!isUser && content.includes('参考来源：')) {
-                const [answer, reference] = content.split('参考来源：');
+            if (!isUser && typeof content === 'object') {
+                const answer = content.answer;
+                const files = content.references.files;
+                
+                let referenceHtml = '';
+                if (files && files.length > 0) {
+                    referenceHtml = '<div class="reference">参考来源：<ul>';
+                    files.forEach(fileName => {
+                        referenceHtml += `<li>${fileName}</li>`;
+                    });
+                    referenceHtml += '</ul></div>';
+                }
+
                 messageDiv.innerHTML = `
                     <div class="content">${answer}</div>
-                    <div class="reference">参考来源：${reference}</div>
+                    ${referenceHtml}
                 `;
             } else {
                 messageDiv.innerHTML = `<div class="content">${content}</div>`;

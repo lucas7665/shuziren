@@ -274,5 +274,10 @@ public class RepoService {
         }
     }
 
+    public ApiResponse<?> getFileInfo(String fileId) {
+        String url = domain + "/openapi/v1/file/info?fileId=" + fileId;
+        return ApiAuthUtil.get(url, appId, secret);
+    }
+
     // ... 其他方法实现
 } 

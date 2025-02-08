@@ -4,7 +4,6 @@ import cn.xfyun.example.dto.ApiResponse;
 import cn.xfyun.example.dto.repo.RepoChatRequest;
 import cn.xfyun.example.service.RepoChatService;
 import io.swagger.v3.oas.annotations.Operation;
-import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import lombok.RequiredArgsConstructor;
 import org.springframework.web.bind.annotation.*;

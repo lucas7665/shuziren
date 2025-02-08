@@ -8,6 +8,7 @@ import cn.xfyun.example.dto.repo.RepoChatRequest;
 import cn.xfyun.example.util.ApiAuthUtil;
 import lombok.extern.slf4j.Slf4j;
 import okhttp3.*;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +27,13 @@ public class RepoChatService {
     private String chatUrl;
 
     private final OkHttpClient client = new OkHttpClient();
+
+    private final RepoService repoService;
+
+    @Autowired
+    public RepoChatService(RepoService repoService) {
+        this.repoService = repoService;
+    }
 
     public ApiResponse<?> chat(RepoChatRequest request) {
         long ts = System.currentTimeMillis() / 1000;
@@ -95,6 +103,7 @@ public class RepoChatService {
             request.getRepoId(), request.getQuestion(), requestBody);
 
         final StringBuilder buffer = new StringBuilder();
+        final JSONObject references = new JSONObject();
         final Object lock = new Object();
 
         WebSocket webSocket = client.newWebSocket(
@@ -104,21 +113,37 @@ public class RepoChatService {
                 public void onMessage(WebSocket webSocket, String text) {
                     JSONObject response = JSONUtil.parseObj(text);
                     if (response.getInt("code") == 0) {
-                        // 添加响应状态日志
-                        log.debug("收到响应: status={}, content={}", 
-                            response.getInt("status"), response.getStr("content", ""));
+                        int status = response.getInt("status");
                         
-                        // 记录引用信息
-                        if (response.getInt("status") == 99) {
-                            log.info("文档引用: {}", response.getStr("fileRefer", ""));
-                        }
-
-                        String content = response.getStr("content", "");
-                        buffer.append(content);
-                        
-                        if (response.getInt("status") == 2) {
-                            synchronized (lock) {
-                                lock.notify();
+                        if (status == 99) {
+                            String fileRefer = response.getStr("fileRefer");
+                            if (fileRefer != null) {
+                                JSONObject fileRefs = JSONUtil.parseObj(fileRefer);
+                                // 创建文件名列表，不包含chunks信息
+                                JSONArray fileNames = JSONUtil.createArray();
+                                fileRefs.forEach((fileId, chunks) -> {
+                                    ApiResponse<?> fileResponse = repoService.getFileInfo(fileId);
+                                    if (fileResponse.isSuccess() && fileResponse.getData() != null) {
+                                        JSONObject fileInfo = JSONUtil.parseObj(fileResponse.getData());
+                                        String fileName = fileInfo.getStr("fileName");
+                                        if (fileName != null) {
+                                            String cleanFileName = fileName.replaceAll("^[\\w-]+-", "")
+                                                        .replaceAll("^\\d+", "");
+                                            fileNames.add(cleanFileName);
+                                        }
+                                    }
+                                });
+                                // 设置文件名列表
+                                references.set("files", fileNames);
+                            }
+                        } else {
+                            String content = response.getStr("content", "");
+                            buffer.append(content);
+                            
+                            if (status == 2) {
+                                synchronized (lock) {
+                                    lock.notify();
+                                }
                             }
                         }
                     } else {
@@ -154,8 +179,13 @@ public class RepoChatService {
         }
 
         String answer = buffer.toString();
-        return answer.isEmpty() ? 
-            ApiResponse.error("未获取到回答") : 
-            ApiResponse.success(answer);
+        if (answer.isEmpty()) {
+            return ApiResponse.error("未获取到回答");
+        }
+
+        JSONObject result = new JSONObject();
+        result.set("answer", answer);
+        result.set("references", references);
+        return ApiResponse.success(result);
     }
 } 
